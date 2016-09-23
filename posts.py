@@ -39,8 +39,7 @@ def unicode_normalize(text):
 
 def getFacebookPageFeedData(page_id, access_token, num_statuses):
 
-    # Construct the URL string; see http://stackoverflow.com/a/37239851 for
-    # Reactions parameters
+    # Construct the URL string; see http://stackoverflow.com/a/37239851 for Reactions parameters
     base = "https://graph.facebook.com/v2.6"
     node = "/%s/posts" % page_id
     fields = "/?fields=message,link,permalink_url,created_time,type,name,id," + \
@@ -55,9 +54,6 @@ def getFacebookPageFeedData(page_id, access_token, num_statuses):
     return data
 
 def getReactionsForStatus(status_id, access_token):
-
-    # See http://stackoverflow.com/a/37239851 for Reactions parameters
-        # Reactions are only accessable at a single-post endpoint
 
     base = "https://graph.facebook.com/v2.6"
     node = "/%s" % status_id
@@ -209,6 +205,3 @@ def scrapeFacebookPageFeedStatus(page_id, access_token):
 
 if __name__ == '__main__':
     scrapeFacebookPageFeedStatus(page_id, access_token)
-
-
-# The CSV can be opened in all major statistical programs. Have fun! :)
