@@ -4,6 +4,7 @@ import datetime
 import csv
 import time
 from nltk.stem.lancaster import LancasterStemmer
+import re
 
 st = LancasterStemmer()
 
@@ -32,14 +33,17 @@ def request_until_succeed(url):
 
     return response.read()
 
-# Needed to write tricky unicode correctly to csv
 def unicode_normalize(text):
     return text.translate({ 0x2018:0x27, 0x2019:0x27, 0x201C:0x22, 0x201D:0x22,
                             0xa0:0x20 }).encode('utf-8')
 
+def removePunctuation(text):
+    return re.sub('[^a-z| |0-9]', '', text.strip().lower())
+
 def getFacebookPageFeedData(page_id, access_token, num_statuses):
 
-    # Construct the URL string; see http://stackoverflow.com/a/37239851 for Reactions parameters
+    # Construct the URL string; see http://stackoverflow.com/a/37239851 for
+    # Reactions parameters
     base = "https://graph.facebook.com/v2.6"
     node = "/%s/posts" % page_id
     fields = "/?fields=message,link,permalink_url,created_time,type,name,id," + \
@@ -54,6 +58,9 @@ def getFacebookPageFeedData(page_id, access_token, num_statuses):
     return data
 
 def getReactionsForStatus(status_id, access_token):
+
+    # See http://stackoverflow.com/a/37239851 for Reactions parameters
+        # Reactions are only accessable at a single-post endpoint
 
     base = "https://graph.facebook.com/v2.6"
     node = "/%s" % status_id
@@ -75,15 +82,11 @@ def getReactionsForStatus(status_id, access_token):
 
 def processFacebookPageFeedStatus(status, access_token):
 
-    # The status is now a Python dictionary, so for top-level items,
-    # we can simply call the key.
-
-    # Additionally, some items may not always exist,
-    # so must check for existence first
+    # Some items may not always exist, must check for existence first
 
     status_id = status['id']
     status_message = '' if 'message' not in status.keys() else \
-            unicode_normalize(status['message'])
+            removePunctuation(unicode_normalize(status['message']))
     status_message_nlp = ''
     for token in status_message.decode('utf-8').split():
         status_message_nlp = status_message_nlp + st.stem(token) + ' '
@@ -94,15 +97,13 @@ def processFacebookPageFeedStatus(status, access_token):
             unicode_normalize(status['link'])
     status_permalink_url = '' if 'permalink_url' not in status.keys() else \
             unicode_normalize(status['permalink_url'])
-    # Time needs special care since a) it's in UTC and
-    # b) it's not easy to use in statistical programs.
 
     status_published = datetime.datetime.strptime(
             status['created_time'],'%Y-%m-%dT%H:%M:%S+0000')
     status_published = status_published + \
-            datetime.timedelta(hours=-5) # EST
+            datetime.timedelta(hours=+8) # HK Time
     status_published = status_published.strftime(
-            '%Y-%m-%d %H:%M:%S') # best time format for spreadsheet programs
+            '%Y-%m-%d %H:%M:%S')
 
     # Nested items require chaining dictionary keys.
 
@@ -113,17 +114,13 @@ def processFacebookPageFeedStatus(status, access_token):
     num_shares = 0 if 'shares' not in status else status['shares']['count']
 
     # Counts of each reaction separately; good for sentiment
-    # Only check for reactions if past date of implementation:
-    # http://newsroom.fb.com/news/2016/02/reactions-now-available-globally/
 
-    reactions = getReactionsForStatus(status_id, access_token) if \
-            status_published > '2016-02-24 00:00:00' else {}
+    reactions = getReactionsForStatus(status_id, access_token)
 
     num_likes = 0 if 'like' not in reactions else \
             reactions['like']['summary']['total_count']
 
-    # Special case: Set number of Likes to Number of reactions for pre-reaction
-    # statuses
+    # Special case: Set number of Likes to Number of reactions for pre-reaction statuses
 
     num_likes = num_reactions if status_published < '2016-02-24 00:00:00' \
             else num_likes
@@ -187,7 +184,7 @@ def scrapeFacebookPageFeedStatus(page_id, access_token):
                 if num_processed == 100000:
                     has_next_page = False
 
-                elif num_processed % 1000 == 0:
+                elif num_processed % 100 == 0:
                     print "%s Statuses Processed: %s" % \
                         (num_processed, datetime.datetime.now())
 
